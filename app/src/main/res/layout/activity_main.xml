@@ -53,8 +53,9 @@
                         android:layout_height="wrap_content"
                         android:text="Applause!"
                         android:id="@+id/textView"
-                        android:textSize="30dp"
-                        android:textColor="#ffffff" />
+                        android:textSize="36dp"
+                        android:textColor="#ffffff"
+                        android:textStyle="bold" />
 
                 </FrameLayout>
 
@@ -69,8 +70,9 @@
                         android:layout_height="wrap_content"
                         android:layout_gravity="end|center_vertical"
                         android:gravity="end"
-                        android:textSize="30dp"
-                        android:textColor="#ffffff" />
+                        android:textSize="36dp"
+                        android:textColor="#ffffff"
+                        android:textStyle="bold" />
 
                 </FrameLayout>
 
@@ -114,8 +116,8 @@
                         android:background="@drawable/slider"
                         android:layout_alignParentEnd="true"
                         android:layout_alignParentRight="true"
-                        android:layout_marginEnd="8dp"
-                        android:layout_marginRight="8dp"
+                        android:layout_marginEnd="20dp"
+                        android:layout_marginRight="20dp"
                         android:layout_alignParentBottom="true" />
 
                     <TextView
