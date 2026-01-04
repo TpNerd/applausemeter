@@ -1,10 +1,14 @@
 package com.example.toshi.applausometer;
 
 
-import android.app.Activity;
-import android.content.res.Configuration;
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.media.MediaRecorder;
 import android.os.Bundle;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 
 
@@ -19,14 +23,12 @@ import android.view.animation.AnimationUtils;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.os.Environment;
 import android.widget.ArrayAdapter;
 
 import android.widget.ImageView;
 import android.widget.ListView;
 
-import org.w3c.dom.Text;
-
+import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -34,7 +36,10 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 
-public class MainActivity extends Activity {
+public class MainActivity extends AppCompatActivity {
+    private static final int REQUEST_RECORD_AUDIO_PERMISSION = 1001;
+    private boolean startRecordingAfterPermission = false;
+
     public class myTimerTask extends TimerTask {
         @Override
         public void run() {
@@ -173,8 +178,6 @@ public class MainActivity extends Activity {
                 }
             });
 
-
-
             isRecording = false;
             score= ((ticks/progress)/660)+50;
             double iu= ticks/progress;
@@ -194,9 +197,7 @@ public class MainActivity extends Activity {
 
             myImage.setImageResource(RR);
 
-
             DecimalFormat df = new DecimalFormat("00.00");
-
 
             punteggio = String.valueOf(df.format(score));
             if (num>7)
@@ -214,29 +215,19 @@ public class MainActivity extends Activity {
             myTimer2.cancel();
             myAudioRecorder.stop();
             myAudioRecorder.release();
-            /*myAudioRecorder = null;
-            myAudioRecorder = new MediaRecorder();
-            myAudioRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-            myAudioRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
-            myAudioRecorder.setAudioEncoder(MediaRecorder.OutputFormat.AMR_NB);
-            myAudioRecorder.setOutputFile(outputFile);
-            try {
-                myAudioRecorder.prepare();
-                myAudioRecorder.start();
-            } catch (IllegalStateException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }*/
-
 
         }
     };
 
     public void reggistra() {
 
+        if (outputFile == null) {
+            File outDir = getExternalFilesDir(null);
+            if (outDir == null) {
+                outDir = getFilesDir();
+            }
+            outputFile = new File(outDir, "recording.3gp").getAbsolutePath();
+        }
 
         myAudioRecorder = new MediaRecorder();
         myAudioRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
@@ -245,37 +236,27 @@ public class MainActivity extends Activity {
         myAudioRecorder.setOutputFile(outputFile);
         try {
             myAudioRecorder.prepare();
-        myAudioRecorder.start();
-    } catch (IllegalStateException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
-    } catch (IOException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
-    }
+            myAudioRecorder.start();
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
+        myTimer2 = new Timer();
+        TimerTask2 = new myTimerTask2();
 
-
-
-
-    myTimer2 = new Timer();
-    TimerTask2 = new myTimerTask2();
-
-    myTimer2.schedule(TimerTask2, 7000, 7000);
+        myTimer2.schedule(TimerTask2, 7000, 7000);
         lista1.setVisibility(View.INVISIBLE);
-    isRecording = true;
+        isRecording = true;
 
-
-    Toast.makeText(getApplicationContext(), "Sto Ascoltando...", Toast.LENGTH_LONG).show();
-};
-
-
+        Toast.makeText(getApplicationContext(), "Sto Ascoltando...", Toast.LENGTH_LONG).show();
+    };
 
     @Override
-    public void onSaveInstanceState(Bundle outState)
+    public void onSaveInstanceState(@NonNull Bundle outState)
     {
-       // Toast.makeText(getApplicationContext(), "save", Toast.LENGTH_LONG).show();
-
+        super.onSaveInstanceState(outState);
     }
 
     @Override
@@ -294,84 +275,96 @@ public class MainActivity extends Activity {
         adapter.notifyDataSetChanged();
         myTimer.schedule(TimerTask1, 0, 100);
 
-        ImageButton myImageButton = (ImageButton) findViewById(R.id.myImageButton);
+        final ImageButton myImageButton = (ImageButton) findViewById(R.id.myImageButton);
         final Animation animation1 = AnimationUtils.loadAnimation(this, R.anim.anim_x);
-        //qua
 
         TextView myTextViewLOC = (TextView) findViewById(R.id.textView2);
         myTextViewLOC.startAnimation(animation1);
-
-
-
 
         myImageButton.setOnTouchListener(
                 new View.OnTouchListener(){
                     @Override
                     public boolean onTouch (View v, MotionEvent event)
                     {
-
                         if ((event.getActionMasked() == MotionEvent.ACTION_DOWN) && (isRecording==false))
                         {
+                            if (!hasRecordAudioPermission()) {
+                                startRecordingAfterPermission = true;
+                                requestRecordAudioPermission();
+                                return true;
+                            }
+
                             reggistra();
                             v.startAnimation(animation1);
-
-                            //qua
 
                             TextView myTextViewLOC = (TextView) findViewById(R.id.textView2);
                             myTextViewLOC.startAnimation(animation1);
 
-                            return false;}
+                            return false;
+                        }
 
-                return true;    }
-
+                        return true;
+                    }
                 }
-
-
         );
-
-
-
 
         if (firstTime) {
             firstTime = false;
         }
 
-        outputFile = Environment.getExternalStorageDirectory().getAbsolutePath() + "/recording.3gp";
-        myAudioRecorder = new MediaRecorder();
-        myAudioRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-        myAudioRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
-        myAudioRecorder.setAudioEncoder(MediaRecorder.OutputFormat.AMR_NB);
-        myAudioRecorder.setOutputFile(outputFile);
+        File outDir = getExternalFilesDir(null);
+        if (outDir == null) {
+            outDir = getFilesDir();
+        }
+        outputFile = new File(outDir, "recording.3gp").getAbsolutePath();
+
         final Animation animation4 = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.anim_stop_down);
         myImageButton.startAnimation(animation4);
-//qua
-
-        //TextView myTextViewLOC = (TextView) findViewById(R.id.textView2);
         myTextViewLOC.startAnimation(animation4);
     }
 
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        // getMenuInflater().inflate(R.menu.menu_main, menu);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-
         int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        //if (id == R.id.action_settings) {
-        //  return true;
-        //}
         return super.onOptionsItemSelected(item);
     }
-}
 
+    private boolean hasRecordAudioPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestRecordAudioPermission() {
+        ActivityCompat.requestPermissions(
+                this,
+                new String[] { Manifest.permission.RECORD_AUDIO },
+                REQUEST_RECORD_AUDIO_PERMISSION
+        );
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode,
+            @NonNull String[] permissions,
+            @NonNull int[] grantResults
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_RECORD_AUDIO_PERMISSION) {
+            final boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (granted && startRecordingAfterPermission && !isRecording) {
+                startRecordingAfterPermission = false;
+                reggistra();
+            } else if (!granted) {
+                startRecordingAfterPermission = false;
+                Toast.makeText(getApplicationContext(), "Microphone permission denied", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+}
 

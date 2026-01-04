@@ -1,40 +1,40 @@
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
+
+configurations.configureEach {
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+}
 
 android {
-    signingConfigs {
-        config {
-            keyAlias 'ToshiWarez'
-            keyPassword '8Satomi8'
-        }
-    }
-    compileSdkVersion 23
-    buildToolsVersion "23.0.2"
+    namespace 'com.example.toshi.applausometer'
+    compileSdk 34
     defaultConfig {
-        applicationId 'com.example.toshi.applause'
-        minSdkVersion 15
-        targetSdkVersion 15
+        applicationId 'com.example.toshi.applausometer'
+        minSdk 21
+        targetSdk 34
         versionCode 1
         versionName "1.0"
     }
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     productFlavors {
     }
-    dexOptions {
-    }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_7
-        targetCompatibility JavaVersion.VERSION_1_7
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 }
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
-    testCompile 'junit:junit:4.12'
-    compile 'com.android.support:appcompat-v7:23.1.1'
-    compile 'com.android.support:design:23.1.1'
+    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.22')
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    testImplementation 'junit:junit:4.13.2'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.core:core:1.13.1'
 }
