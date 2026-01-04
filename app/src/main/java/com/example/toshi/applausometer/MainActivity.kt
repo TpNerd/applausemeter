@@ -2,40 +2,86 @@ package com.example.toshi.applausometer
 
 import android.Manifest
 import android.os.Bundle
-import android.view.MotionEvent
-import android.view.View
-import android.view.animation.Animation
-import android.view.animation.AnimationUtils
-import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.example.toshi.applausometer.databinding.ActivityMainBinding
+import androidx.activity.compose.setContent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.DecimalFormat
 import kotlin.math.max
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityMainBinding
+    private enum class SliderAnimMode {
+        StopDown,
+        XUp,
+        Stop,
+        Down,
+    }
 
     private lateinit var recorderController: AudioRecorderController
     private lateinit var outputFileProvider: OutputFileProvider
 
-    private var isRecording = false
-    private var progress = 0
+    private var isRecording by mutableStateOf(false)
+    private var sampleCount by mutableStateOf(0)
     private val stats = RecordingStats()
 
     private var sampleJob: Job? = null
     private var stopJob: Job? = null
 
-    private val scoreList = ArrayList<String>()
-    private lateinit var adapter: ArrayAdapter<String>
+    private val scoreList = mutableStateListOf<String>()
     private var num = 1
+
+    private var statusText by mutableStateOf("Idle")
+    private var scoreText by mutableStateOf("")
+    private var timerText by mutableStateOf("<")
+    private var meterResId by mutableIntStateOf(R.drawable.lights10)
+    private var listVisible by mutableStateOf(true)
+    private var sliderAnimMode by mutableStateOf(SliderAnimMode.StopDown)
 
     private val requestMicPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -44,46 +90,41 @@ class MainActivity : AppCompatActivity() {
             startRecording()
         } else {
             Toast.makeText(this, "Microphone permission denied", Toast.LENGTH_LONG).show()
+            sliderAnimMode = SliderAnimMode.StopDown
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
 
         recorderController = AudioRecorderController(this)
         outputFileProvider = OutputFileProvider(this)
 
-        applySystemBarsStyle(R.color.colorSystemBars, binding.root)
-        binding.safeContainer.applySystemBarsPadding()
-
-        adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, scoreList)
-        binding.listView.adapter = adapter
-
-        val animationX = AnimationUtils.loadAnimation(this, R.anim.anim_x)
-        val animationStopDown = AnimationUtils.loadAnimation(applicationContext, R.anim.anim_stop_down)
-
-        binding.textView2.startAnimation(animationX)
-        binding.myImageButton.startAnimation(animationStopDown)
-        binding.textView2.startAnimation(animationStopDown)
-
-        binding.myImageButton.setOnTouchListener { v, event ->
-            if (event.actionMasked == MotionEvent.ACTION_DOWN && !isRecording) {
-                if (hasRecordAudioPermission()) {
-                    startRecording()
-                } else {
-                    requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
-                }
-                v.startAnimation(animationX)
-                binding.textView2.startAnimation(animationX)
-                return@setOnTouchListener true
+        setContent {
+            MaterialTheme {
+                ApplauseScreen(
+                    statusText = statusText,
+                    scoreText = scoreText,
+                    timerText = timerText,
+                    meterResId = meterResId,
+                    listVisible = listVisible,
+                    scores = scoreList,
+                    sliderAnimMode = sliderAnimMode,
+                    onSliderPressed = {
+                        if (!isRecording) {
+                            sliderAnimMode = SliderAnimMode.XUp
+                            if (hasRecordAudioPermission()) {
+                                startRecording()
+                            } else {
+                                requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        }
+                    },
+                )
             }
-            true
         }
 
-        binding.textView.text = "Idle"
-        binding.textViewScore.text = ""
+        applySystemBarsStyle(R.color.colorSystemBars, window.decorView)
     }
 
     override fun onDestroy() {
@@ -100,10 +141,12 @@ class MainActivity : AppCompatActivity() {
     private fun startRecording() {
         if (isRecording) return
 
-        progress = 0
+        sampleCount = 0
         stats.reset()
-        binding.textViewScore.text = ""
-        binding.listView.visibility = View.INVISIBLE
+        scoreText = ""
+        listVisible = false
+        timerText = "<"
+        sliderAnimMode = SliderAnimMode.XUp
 
         val ok = recorderController.start(outputFileProvider.recordingFile())
         if (!ok) {
@@ -120,32 +163,29 @@ class MainActivity : AppCompatActivity() {
     private fun startSamplingLoop() {
         stopJobs()
 
-        val animationStop = AnimationUtils.loadAnimation(applicationContext, R.anim.anim_stop)
-
         sampleJob = lifecycleScope.launch {
             while (isRecording) {
                 val amp = recorderController.maxAmplitude()
 
                 if (amp > 0) {
-                    binding.meter.setImageResource(MeterLogic.drawableForAmplitude(amp))
+                    meterResId = MeterLogic.drawableForAmplitude(amp)
                 }
 
-                progress += 1
+                sampleCount += 1
                 stats.addSample(amp)
 
-                if (progress == 10) {
-                    binding.myImageButton.startAnimation(animationStop)
-                    binding.textView2.startAnimation(animationStop)
+                if (sampleCount == 10) {
+                    sliderAnimMode = SliderAnimMode.Stop
                 }
 
                 val df2 = DecimalFormat("00")
                 val su = df2.format((amp.toFloat() / 330f))
-                binding.textView.text = "Listening..."
-                binding.textViewScore.text = su
+                statusText = "Listening..."
+                scoreText = su
 
-                val remaining = max(0.0, 8.0 - ((progress - 1.0) / 10.0))
+                val remaining = max(0.0, 8.0 - ((sampleCount - 1.0) / 10.0))
                 val df1 = DecimalFormat("0")
-                binding.textView2.text = " ${df1.format(remaining)}"
+                timerText = " ${df1.format(remaining)}"
 
                 delay(100)
             }
@@ -162,47 +202,37 @@ class MainActivity : AppCompatActivity() {
     private fun finishRecordingAndShowScore() {
         if (!isRecording) return
 
-        val animationDown = AnimationUtils.loadAnimation(applicationContext, R.anim.anim_down)
-        binding.myImageButton.startAnimation(animationDown)
-        binding.textView2.startAnimation(animationDown)
-
-        animationDown.setAnimationListener(object : Animation.AnimationListener {
-            override fun onAnimationStart(animation: Animation?) = Unit
-            override fun onAnimationRepeat(animation: Animation?) = Unit
-
-            override fun onAnimationEnd(animation: Animation?) {
-                val animationStopDown =
-                    AnimationUtils.loadAnimation(applicationContext, R.anim.anim_stop_down)
-                binding.myImageButton.startAnimation(animationStopDown)
-                binding.textView2.startAnimation(animationStopDown)
-                binding.textView2.text = "<3"
-            }
-        })
-
         isRecording = false
         stopJobs()
 
         val avg = stats.average()
         val score = MeterLogic.scoreForAverage(avg)
-        binding.meter.setImageResource(MeterLogic.drawableForAmplitude(avg.toLong()))
+        meterResId = MeterLogic.drawableForAmplitude(avg.toLong())
 
         val dfScore = DecimalFormat("00.00")
         val scoreText = dfScore.format(score)
 
-        if (num > 7 && adapter.count > 0) {
-            adapter.remove(adapter.getItem(0))
+        while (num > 7 && scoreList.isNotEmpty()) {
+            scoreList.removeAt(0)
         }
 
-        binding.textView.text = "Idle"
-        binding.textViewScore.text = scoreText
-        adapter.add("${num++}: $scoreText")
+        statusText = "Idle"
+        this.scoreText = scoreText
+        scoreList.add("${num++}: $scoreText")
 
         Toast.makeText(this, ": $scoreText punti!", Toast.LENGTH_LONG).show()
 
-        progress = 0
+        sampleCount = 0
         stats.reset()
 
-        binding.listView.visibility = View.VISIBLE
+        listVisible = true
+        timerText = "<3"
+        sliderAnimMode = SliderAnimMode.Down
+
+        lifecycleScope.launch {
+            delay(400)
+            sliderAnimMode = SliderAnimMode.StopDown
+        }
 
         recorderController.stopAndRelease()
     }
@@ -215,4 +245,244 @@ class MainActivity : AppCompatActivity() {
         stopJob = null
     }
 
+    @Composable
+    private fun ApplauseScreen(
+        statusText: String,
+        scoreText: String,
+        timerText: String,
+        meterResId: Int,
+        listVisible: Boolean,
+        scores: List<String>,
+        sliderAnimMode: SliderAnimMode,
+        onSliderPressed: () -> Unit,
+    ) {
+        val background = colorResource(R.color.colorSystemBars)
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(background)
+                .windowInsetsPadding(WindowInsets.systemBars),
+        ) {
+            Image(
+                painter = painterResource(R.drawable.sfondo2),
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(3f),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(7f)
+                            .fillMaxSize(),
+                    ) {
+                        Text(
+                            text = statusText,
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.align(Alignment.TopStart),
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(8f)
+                            .fillMaxSize(),
+                    ) {
+                        Text(
+                            text = scoreText,
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(18f),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(7f)
+                            .fillMaxSize(),
+                    ) {
+                        if (listVisible) {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                reverseLayout = true,
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                    bottom = 110.dp,
+                                ),
+                            ) {
+                                items(scores.asReversed()) { item ->
+                                    Text(
+                                        text = item,
+                                        color = Color.White,
+                                        fontSize = 18.sp,
+                                        textAlign = TextAlign.Start,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 6.dp),
+                                    )
+                                }
+                            }
+                        }
+
+                        SliderAndTimer(
+                            timerText = timerText,
+                            sliderAnimMode = sliderAnimMode,
+                            onSliderPressed = onSliderPressed,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 20.dp),
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(8f)
+                            .fillMaxSize(),
+                    ) {
+                        Image(
+                            painter = painterResource(meterResId),
+                            contentDescription = null,
+                            contentScale = ContentScale.FillBounds,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun SliderAndTimer(
+        timerText: String,
+        sliderAnimMode: SliderAnimMode,
+        onSliderPressed: () -> Unit,
+        modifier: Modifier = Modifier,
+    ) {
+        BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+            val parentHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
+            val translateFrac = rememberSliderTranslateFraction(sliderAnimMode)
+
+            Row(
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .graphicsLayer {
+                        translationY = parentHeightPx * translateFrac
+                    },
+            ) {
+                Text(
+                    text = timerText,
+                    color = Color(0xFFF72EF0),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp,
+                    modifier = Modifier.padding(top = 36.dp),
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Image(
+                    painter = painterResource(R.drawable.slider),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(width = 64.dp, height = 98.dp)
+                        .clickable(onClick = onSliderPressed),
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun rememberSliderTranslateFraction(sliderAnimMode: SliderAnimMode): Float {
+        val anim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(-0.01f) }
+
+        androidx.compose.runtime.LaunchedEffect(sliderAnimMode) {
+            when (sliderAnimMode) {
+                SliderAnimMode.StopDown -> {
+                    anim.snapTo(-0.01f)
+                    while (isActive) {
+                        anim.animateTo(
+                            targetValue = -0.04f,
+                            animationSpec = androidx.compose.animation.core.tween(
+                                durationMillis = 1000,
+                                easing = androidx.compose.animation.core.LinearEasing,
+                            ),
+                        )
+                        anim.animateTo(
+                            targetValue = -0.01f,
+                            animationSpec = androidx.compose.animation.core.tween(
+                                durationMillis = 1000,
+                                easing = androidx.compose.animation.core.LinearEasing,
+                            ),
+                        )
+                    }
+                }
+
+                SliderAnimMode.XUp -> {
+                    anim.snapTo(-0.10f)
+                    anim.animateTo(
+                        targetValue = -0.65f,
+                        animationSpec = androidx.compose.animation.core.tween(
+                            durationMillis = 1000,
+                            easing = androidx.compose.animation.core.LinearEasing,
+                        ),
+                    )
+                }
+
+                SliderAnimMode.Stop -> {
+                    anim.snapTo(-0.65f)
+                    while (isActive) {
+                        anim.animateTo(
+                            targetValue = -0.60f,
+                            animationSpec = androidx.compose.animation.core.tween(
+                                durationMillis = 500,
+                                easing = androidx.compose.animation.core.LinearEasing,
+                            ),
+                        )
+                        anim.animateTo(
+                            targetValue = -0.65f,
+                            animationSpec = androidx.compose.animation.core.tween(
+                                durationMillis = 500,
+                                easing = androidx.compose.animation.core.LinearEasing,
+                            ),
+                        )
+                    }
+                }
+
+                SliderAnimMode.Down -> {
+                    anim.snapTo(-0.55f)
+                    anim.animateTo(
+                        targetValue = -0.10f,
+                        animationSpec = androidx.compose.animation.core.tween(
+                            durationMillis = 400,
+                            easing = androidx.compose.animation.core.LinearEasing,
+                        ),
+                    )
+                }
+            }
+        }
+
+        return anim.value
+    }
 }
