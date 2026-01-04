@@ -51,7 +51,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Applause!"
+                        android:text="Idle"
                         android:id="@+id/textView"
                         android:textSize="36dp"
                         android:textColor="#ffffff"
@@ -124,7 +124,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textAppearance="?android:attr/textAppearanceLarge"
-                        android:text="&lt;----   Click me!"
+                        android:text="&lt;"
                         android:id="@+id/textView2"
                         android:layout_alignTop="@+id/myImageButton"
                         android:layout_toStartOf="@+id/myImageButton"

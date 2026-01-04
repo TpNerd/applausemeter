@@ -8,6 +8,10 @@
         <item name="colorAccent">@color/colorAccent</item>
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
+        <item name="android:statusBarColor">@color/colorSystemBars</item>
+        <item name="android:navigationBarColor">@color/colorSystemBars</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
 </resources>

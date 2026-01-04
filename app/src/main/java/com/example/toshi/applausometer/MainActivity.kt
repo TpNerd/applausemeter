@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -57,6 +58,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        window.statusBarColor = ContextCompat.getColor(this, R.color.colorSystemBars)
+        window.navigationBarColor = ContextCompat.getColor(this, R.color.colorSystemBars)
+        WindowCompat.getInsetsController(window, binding.root).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.safeContainer) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -157,8 +165,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         isRecording = true
-        Toast.makeText(this, "Sto Ascoltando...", Toast.LENGTH_LONG).show()
-
         startSamplingLoop()
         scheduleStop()
     }
@@ -199,12 +205,12 @@ class MainActivity : AppCompatActivity() {
 
                 val df2 = DecimalFormat("00")
                 val su = df2.format((amp.toFloat() / 330f))
-                binding.textView.text = "Sto ascoltando..."
+                binding.textView.text = "Listening..."
                 binding.textViewScore.text = su
 
                 val remaining = max(0.0, 8.0 - ((progress - 1.0) / 10.0))
                 val df1 = DecimalFormat("0")
-                binding.textView2.text = " ${df1.format(remaining)} sec"
+                binding.textView2.text = " ${df1.format(remaining)}"
 
                 delay(100)
             }
@@ -234,7 +240,7 @@ class MainActivity : AppCompatActivity() {
                     AnimationUtils.loadAnimation(applicationContext, R.anim.anim_stop_down)
                 binding.myImageButton.startAnimation(animationStopDown)
                 binding.textView2.startAnimation(animationStopDown)
-                binding.textView2.text = "<----   Click me!"
+                binding.textView2.text = "<3"
             }
         })
 
@@ -266,7 +272,7 @@ class MainActivity : AppCompatActivity() {
             adapter.remove(adapter.getItem(0))
         }
 
-        binding.textView.text = "Applause!"
+        binding.textView.text = "Idle"
         binding.textViewScore.text = scoreText
         adapter.add("${num++}: $scoreText")
 
