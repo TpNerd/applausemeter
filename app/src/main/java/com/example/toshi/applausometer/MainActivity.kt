@@ -248,7 +248,7 @@ class MainActivity : AppCompatActivity() {
         stopJobs()
 
         val avg = if (progress > 0) ticks / progress else 0.0
-        val score = ((avg / 660.0) + 50.0)
+        val score = ((avg / 330.0))
 
         val drawable = when {
             avg <= 200.0 -> R.drawable.lights0
