@@ -122,6 +122,7 @@ class MainActivity : AppCompatActivity() {
 
         progress = 0.0
         ticks = 0.0
+        binding.textViewScore.text = ""
         binding.listView.visibility = View.INVISIBLE
 
         val localOutputFile = outputFile
@@ -198,7 +199,8 @@ class MainActivity : AppCompatActivity() {
 
                 val df2 = DecimalFormat("00")
                 val su = df2.format((amp.toFloat() / 330f))
-                binding.textView.text = "sto ascoltando    $su"
+                binding.textView.text = "Sto ascoltando..."
+                binding.textViewScore.text = su
 
                 val remaining = max(0.0, 8.0 - ((progress - 1.0) / 10.0))
                 val df1 = DecimalFormat("0")
@@ -264,7 +266,8 @@ class MainActivity : AppCompatActivity() {
             adapter.remove(adapter.getItem(0))
         }
 
-        binding.textView.text = "Applause!            $scoreText!"
+        binding.textView.text = "Applause!"
+        binding.textViewScore.text = scoreText
         adapter.add("${num++}: $scoreText")
 
         Toast.makeText(this, "Ha totalizzato $scoreText punti!", Toast.LENGTH_LONG).show()

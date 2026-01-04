@@ -61,7 +61,18 @@
                 <FrameLayout
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
-                    android:layout_weight="8" />
+                    android:layout_weight="8">
+
+                    <TextView
+                        android:id="@+id/textViewScore"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end|center_vertical"
+                        android:gravity="end"
+                        android:textSize="30dp"
+                        android:textColor="#ffffff" />
+
+                </FrameLayout>
 
             </LinearLayout>
 
@@ -101,8 +112,10 @@
                         android:layout_width="64dp"
                         android:layout_height="98dp"
                         android:background="@drawable/slider"
-                        android:layout_alignParentLeft="true"
-                        android:layout_alignParentStart="true"
+                        android:layout_alignParentEnd="true"
+                        android:layout_alignParentRight="true"
+                        android:layout_marginEnd="8dp"
+                        android:layout_marginRight="8dp"
                         android:layout_alignParentBottom="true" />
 
                     <TextView
@@ -112,8 +125,10 @@
                         android:text="&lt;----   Click me!"
                         android:id="@+id/textView2"
                         android:layout_alignTop="@+id/myImageButton"
-                        android:layout_toRightOf="@+id/myImageButton"
-                        android:layout_marginLeft="12dp"
+                        android:layout_toStartOf="@+id/myImageButton"
+                        android:layout_toLeftOf="@+id/myImageButton"
+                        android:layout_marginEnd="12dp"
+                        android:layout_marginRight="12dp"
                         android:layout_marginTop="36dp"
                         android:elevation="2dp"
                         android:singleLine="true"
