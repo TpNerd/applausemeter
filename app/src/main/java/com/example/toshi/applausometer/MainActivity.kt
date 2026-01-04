@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -28,10 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,52 +45,22 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.setContent
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import java.text.DecimalFormat
-import kotlin.math.max
+import kotlinx.coroutines.flow.collect
 
 class MainActivity : AppCompatActivity() {
-
-    private enum class SliderAnimMode {
-        StopDown,
-        XUp,
-        Stop,
-        Down,
-    }
 
     private lateinit var recorderController: AudioRecorderController
     private lateinit var outputFileProvider: OutputFileProvider
 
-    private var isRecording by mutableStateOf(false)
-    private var sampleCount by mutableStateOf(0)
-    private val stats = RecordingStats()
-
-    private var sampleJob: Job? = null
-    private var stopJob: Job? = null
-
-    private val scoreList = mutableStateListOf<String>()
-    private var num = 1
-
-    private var statusText by mutableStateOf("Idle")
-    private var scoreText by mutableStateOf("")
-    private var timerText by mutableStateOf("<")
-    private var meterResId by mutableIntStateOf(R.drawable.lights10)
-    private var listVisible by mutableStateOf(true)
-    private var sliderAnimMode by mutableStateOf(SliderAnimMode.StopDown)
+    private lateinit var recordingStore: RecordingStore
 
     private val requestMicPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) {
-            startRecording()
-        } else {
-            Toast.makeText(this, "Microphone permission denied", Toast.LENGTH_LONG).show()
-            sliderAnimMode = SliderAnimMode.StopDown
-        }
+        recordingStore.onMicrophonePermissionResult(granted)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -101,25 +69,41 @@ class MainActivity : AppCompatActivity() {
         recorderController = AudioRecorderController(this)
         outputFileProvider = OutputFileProvider(this)
 
+        recordingStore = RecordingStore(
+            scope = lifecycleScope,
+            recorder = recorderController,
+            outputPathProvider = { outputFileProvider.recordingFile().absolutePath },
+        )
+
         setContent {
             MaterialTheme {
-                ApplauseScreen(
-                    statusText = statusText,
-                    scoreText = scoreText,
-                    timerText = timerText,
-                    meterResId = meterResId,
-                    listVisible = listVisible,
-                    scores = scoreList,
-                    sliderAnimMode = sliderAnimMode,
-                    onSliderPressed = {
-                        if (!isRecording) {
-                            sliderAnimMode = SliderAnimMode.XUp
-                            if (hasRecordAudioPermission()) {
-                                startRecording()
-                            } else {
+                val uiState by recordingStore.state.collectAsStateWithLifecycle()
+                val context = LocalContext.current
+
+                LaunchedEffect(Unit) {
+                    recordingStore.effects.collect { effect ->
+                        when (effect) {
+                            RecordingStore.Effect.RequestMicrophonePermission -> {
                                 requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
                             }
+
+                            is RecordingStore.Effect.Toast -> {
+                                Toast.makeText(context, effect.message, Toast.LENGTH_LONG).show()
+                            }
                         }
+                    }
+                }
+
+                ApplauseScreen(
+                    statusText = uiState.statusText,
+                    scoreText = uiState.liveScoreText,
+                    timerText = uiState.timerText,
+                    meterResId = MeterLogic.drawableForLevel(uiState.meterLevel),
+                    listVisible = uiState.listVisible,
+                    scores = uiState.scores,
+                    sliderAnimMode = uiState.sliderAnimMode,
+                    onSliderPressed = {
+                        recordingStore.onSliderPressed(hasPermission = hasRecordAudioPermission())
                     },
                 )
             }
@@ -130,120 +114,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        stopJobs()
-        recorderController.stopAndRelease()
+        recordingStore.stop()
     }
 
     private fun hasRecordAudioPermission(): Boolean {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
-    }
-
-    private fun startRecording() {
-        if (isRecording) return
-
-        sampleCount = 0
-        stats.reset()
-        scoreText = ""
-        listVisible = false
-        timerText = "<"
-        sliderAnimMode = SliderAnimMode.XUp
-
-        val ok = recorderController.start(outputFileProvider.recordingFile())
-        if (!ok) {
-            Toast.makeText(this, "Recorder error", Toast.LENGTH_LONG).show()
-            recorderController.stopAndRelease()
-            return
-        }
-
-        isRecording = true
-        startSamplingLoop()
-        scheduleStop()
-    }
-
-    private fun startSamplingLoop() {
-        stopJobs()
-
-        sampleJob = lifecycleScope.launch {
-            while (isRecording) {
-                val amp = recorderController.maxAmplitude()
-
-                if (amp > 0) {
-                    meterResId = MeterLogic.drawableForAmplitude(amp)
-                }
-
-                sampleCount += 1
-                stats.addSample(amp)
-
-                if (sampleCount == 10) {
-                    sliderAnimMode = SliderAnimMode.Stop
-                }
-
-                val df2 = DecimalFormat("00")
-                val su = df2.format((amp.toFloat() / 330f))
-                statusText = "Listening..."
-                scoreText = su
-
-                val remaining = max(0.0, 8.0 - ((sampleCount - 1.0) / 10.0))
-                val df1 = DecimalFormat("0")
-                timerText = " ${df1.format(remaining)}"
-
-                delay(100)
-            }
-        }
-    }
-
-    private fun scheduleStop() {
-        stopJob = lifecycleScope.launch {
-            delay(7000)
-            finishRecordingAndShowScore()
-        }
-    }
-
-    private fun finishRecordingAndShowScore() {
-        if (!isRecording) return
-
-        isRecording = false
-        stopJobs()
-
-        val avg = stats.average()
-        val score = MeterLogic.scoreForAverage(avg)
-        meterResId = MeterLogic.drawableForAmplitude(avg.toLong())
-
-        val dfScore = DecimalFormat("00.00")
-        val scoreText = dfScore.format(score)
-
-        while (num > 7 && scoreList.isNotEmpty()) {
-            scoreList.removeAt(0)
-        }
-
-        statusText = "Idle"
-        this.scoreText = scoreText
-        scoreList.add("${num++}: $scoreText")
-
-        Toast.makeText(this, ": $scoreText punti!", Toast.LENGTH_LONG).show()
-
-        sampleCount = 0
-        stats.reset()
-
-        listVisible = true
-        timerText = "<3"
-        sliderAnimMode = SliderAnimMode.Down
-
-        lifecycleScope.launch {
-            delay(400)
-            sliderAnimMode = SliderAnimMode.StopDown
-        }
-
-        recorderController.stopAndRelease()
-    }
-
-    private fun stopJobs() {
-        sampleJob?.cancel()
-        sampleJob = null
-
-        stopJob?.cancel()
-        stopJob = null
     }
 
     @Composable
@@ -254,7 +130,7 @@ class MainActivity : AppCompatActivity() {
         meterResId: Int,
         listVisible: Boolean,
         scores: List<String>,
-        sliderAnimMode: SliderAnimMode,
+        sliderAnimMode: RecordingStore.SliderAnimMode,
         onSliderPressed: () -> Unit,
     ) {
         val background = colorResource(R.color.colorSystemBars)
@@ -379,7 +255,7 @@ class MainActivity : AppCompatActivity() {
     @Composable
     private fun SliderAndTimer(
         timerText: String,
-        sliderAnimMode: SliderAnimMode,
+        sliderAnimMode: RecordingStore.SliderAnimMode,
         onSliderPressed: () -> Unit,
         modifier: Modifier = Modifier,
     ) {
@@ -422,12 +298,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     @Composable
-    private fun rememberSliderTranslateFraction(sliderAnimMode: SliderAnimMode): Float {
+    private fun rememberSliderTranslateFraction(sliderAnimMode: RecordingStore.SliderAnimMode): Float {
         val anim = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(-0.01f) }
 
         androidx.compose.runtime.LaunchedEffect(sliderAnimMode) {
             when (sliderAnimMode) {
-                SliderAnimMode.StopDown -> {
+                RecordingStore.SliderAnimMode.StopDown -> {
                     anim.snapTo(-0.01f)
                     while (isActive) {
                         anim.animateTo(
@@ -447,7 +323,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                SliderAnimMode.XUp -> {
+                RecordingStore.SliderAnimMode.XUp -> {
                     anim.snapTo(-0.10f)
                     anim.animateTo(
                         targetValue = -0.65f,
@@ -458,7 +334,7 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
 
-                SliderAnimMode.Stop -> {
+                RecordingStore.SliderAnimMode.Stop -> {
                     anim.snapTo(-0.65f)
                     while (isActive) {
                         anim.animateTo(
@@ -478,7 +354,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                SliderAnimMode.Down -> {
+                RecordingStore.SliderAnimMode.Down -> {
                     anim.snapTo(-0.55f)
                     anim.animateTo(
                         targetValue = -0.10f,

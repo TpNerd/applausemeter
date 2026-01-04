@@ -6,12 +6,14 @@ import android.os.Build
 import java.io.File
 import java.io.IOException
 
-class AudioRecorderController(private val context: Context) {
+class AudioRecorderController(private val context: Context) : Recorder {
 
     private var recorder: MediaRecorder? = null
 
-    fun start(outputFile: File): Boolean {
+    override fun start(outputPath: String): Boolean {
         if (recorder != null) return false
+
+        val outputFile = File(outputPath)
 
         val r = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             MediaRecorder(context)
@@ -45,11 +47,11 @@ class AudioRecorderController(private val context: Context) {
         return true
     }
 
-    fun maxAmplitude(): Long {
+    override fun maxAmplitude(): Long {
         return recorder?.maxAmplitude?.toLong() ?: 0L
     }
 
-    fun stopAndRelease() {
+    override fun stopAndRelease() {
         val r = recorder
         recorder = null
 
