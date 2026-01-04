@@ -30,80 +30,137 @@
             android:paddingTop="@dimen/activity_vertical_margin"
             android:paddingBottom="@dimen/activity_vertical_margin">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Applause!"
-            android:id="@+id/textView"
-            android:textSize="30dp"
-            android:textColor="#ffffff"
-            android:layout_alignParentTop="true"
-            android:layout_alignParentLeft="true"
-            android:layout_alignParentStart="true"
-            android:layout_marginLeft="20dp" />
-
-        <ImageView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:src="@drawable/lights10"
-            android:id="@+id/meter"
-            android:adjustViewBounds="true"
-            android:cropToPadding="false"
-            android:nestedScrollingEnabled="false"
-            android:scaleType="fitEnd"
-            android:layout_alignParentEnd="true"
-            android:layout_alignParentRight="true"
-            android:layout_centerVertical="true" />
+            android:orientation="vertical"
+            android:weightSum="22">
 
-        <ListView
-            android:layout_width="90dp"
-            android:layout_height="wrap_content"
-            android:id="@+id/listView"
-            tools:listitem="@android:layout/simple_list_item_1"
-            android:headerDividersEnabled="false"
-            android:drawSelectorOnTop="false"
-            android:divider="#222322"
-            android:dividerHeight="4dp"
-            android:scrollIndicators="right"
-            android:scrollingCache="false"
-            android:smoothScrollbar="false"
-            android:textFilterEnabled="false"
-            android:stackFromBottom="true"
-            android:layout_alignParentTop="true"
-            android:layout_alignParentLeft="true"
-            android:layout_alignParentStart="true"
-            android:layout_marginTop="68dp"
-            android:layout_marginBottom="90dp"
-            android:layout_marginLeft="56dp"
-            android:textAlignment="center"
-            android:fastScrollEnabled="true" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="3"
+                android:orientation="horizontal"
+                android:weightSum="15">
 
-        <androidx.appcompat.widget.AppCompatImageButton
-            android:id="@+id/myImageButton"
-            android:layout_width="64dp"
-            android:layout_height="98dp"
-            android:background="@drawable/slider"
-            android:layout_alignParentTop="false"
-            android:layout_alignParentLeft="true"
-            android:layout_marginLeft="74dp"
-            android:layout_alignParentBottom="true"
-            android:layout_marginBottom="6dp"
-            />
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="7">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textAppearance="?android:attr/textAppearanceLarge"
-            android:text="&lt;----   Click me!"
-            android:id="@+id/textView2"
-            android:layout_alignTop="@+id/myImageButton"
-            android:layout_toRightOf="@+id/myImageButton"
-            android:layout_marginLeft="12dp"
-            android:layout_marginTop="36dp"
-            android:elevation="2dp"
-            android:singleLine="true"
-            android:textColor="#f72ef0"
-            android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Applause!"
+                        android:id="@+id/textView"
+                        android:textSize="30dp"
+                        android:textColor="#ffffff" />
+
+                </FrameLayout>
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="8" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="18"
+                android:orientation="horizontal"
+                android:weightSum="15">
+
+                <RelativeLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="7">
+
+                    <ListView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:id="@+id/listView"
+                        tools:listitem="@android:layout/simple_list_item_1"
+                        android:headerDividersEnabled="false"
+                        android:drawSelectorOnTop="false"
+                        android:divider="#222322"
+                        android:dividerHeight="4dp"
+                        android:scrollIndicators="right"
+                        android:scrollingCache="false"
+                        android:smoothScrollbar="false"
+                        android:textFilterEnabled="false"
+                        android:stackFromBottom="true"
+                        android:textAlignment="center"
+                        android:fastScrollEnabled="true"
+                        android:layout_alignParentTop="true"
+                        android:layout_above="@+id/myImageButton" />
+
+                    <androidx.appcompat.widget.AppCompatImageButton
+                        android:id="@+id/myImageButton"
+                        android:layout_width="64dp"
+                        android:layout_height="98dp"
+                        android:background="@drawable/slider"
+                        android:layout_alignParentLeft="true"
+                        android:layout_alignParentStart="true"
+                        android:layout_alignParentBottom="true" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?android:attr/textAppearanceLarge"
+                        android:text="&lt;----   Click me!"
+                        android:id="@+id/textView2"
+                        android:layout_alignTop="@+id/myImageButton"
+                        android:layout_toRightOf="@+id/myImageButton"
+                        android:layout_marginLeft="12dp"
+                        android:layout_marginTop="36dp"
+                        android:elevation="2dp"
+                        android:singleLine="true"
+                        android:textColor="#f72ef0"
+                        android:textStyle="bold" />
+
+                </RelativeLayout>
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="8">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/lights10"
+                        android:id="@+id/meter"
+                        android:adjustViewBounds="false"
+                        android:cropToPadding="false"
+                        android:nestedScrollingEnabled="false"
+                        android:scaleType="fitXY" />
+
+                </FrameLayout>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:weightSum="15">
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="7" />
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="8" />
+
+            </LinearLayout>
+
+        </LinearLayout>
 
         </RelativeLayout>
 
