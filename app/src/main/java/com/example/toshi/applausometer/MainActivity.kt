@@ -1,9 +1,7 @@
 package com.example.toshi.applausometer
 
 import android.Manifest
-import android.media.MediaRecorder
 import android.os.Bundle
-import android.os.Build
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.Animation
@@ -12,17 +10,12 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.toshi.applausometer.databinding.ActivityMainBinding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.io.File
-import java.io.IOException
 import java.text.DecimalFormat
 import kotlin.math.max
 
@@ -30,12 +23,12 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
-    private var recorder: MediaRecorder? = null
-    private var outputFile: String? = null
+    private lateinit var recorderController: AudioRecorderController
+    private lateinit var outputFileProvider: OutputFileProvider
 
     private var isRecording = false
-    private var progress = 0.0
-    private var ticks = 0.0
+    private var progress = 0
+    private val stats = RecordingStats()
 
     private var sampleJob: Job? = null
     private var stopJob: Job? = null
@@ -59,24 +52,11 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        window.statusBarColor = ContextCompat.getColor(this, R.color.colorSystemBars)
-        window.navigationBarColor = ContextCompat.getColor(this, R.color.colorSystemBars)
-        WindowCompat.getInsetsController(window, binding.root).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
-        }
+        recorderController = AudioRecorderController(this)
+        outputFileProvider = OutputFileProvider(this)
 
-        ViewCompat.setOnApplyWindowInsetsListener(binding.safeContainer) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(
-                systemBars.left,
-                systemBars.top,
-                systemBars.right,
-                systemBars.bottom,
-            )
-            insets
-        }
-        ViewCompat.requestApplyInsets(binding.safeContainer)
+        applySystemBarsStyle(R.color.colorSystemBars, binding.root)
+        binding.safeContainer.applySystemBarsPadding()
 
         adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, scoreList)
         binding.listView.adapter = adapter
@@ -102,13 +82,14 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
-        ensureOutputFile()
+        binding.textView.text = "Idle"
+        binding.textViewScore.text = ""
     }
 
     override fun onDestroy() {
         super.onDestroy()
         stopJobs()
-        releaseRecorder()
+        recorderController.stopAndRelease()
     }
 
     private fun hasRecordAudioPermission(): Boolean {
@@ -116,51 +97,18 @@ class MainActivity : AppCompatActivity() {
             android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
-    private fun ensureOutputFile() {
-        if (outputFile != null) return
-
-        val outDir = getExternalFilesDir(null) ?: filesDir
-        outputFile = File(outDir, "recording.3gp").absolutePath
-    }
-
     private fun startRecording() {
         if (isRecording) return
 
-        ensureOutputFile()
-
-        progress = 0.0
-        ticks = 0.0
+        progress = 0
+        stats.reset()
         binding.textViewScore.text = ""
         binding.listView.visibility = View.INVISIBLE
 
-        val localOutputFile = outputFile
-        if (localOutputFile == null) {
-            Toast.makeText(this, "Failed to prepare output file", Toast.LENGTH_LONG).show()
-            return
-        }
-
-        val r = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            MediaRecorder(this)
-        } else {
-            @Suppress("DEPRECATION")
-            MediaRecorder()
-        }
-        recorder = r
-
-        try {
-            r.setAudioSource(MediaRecorder.AudioSource.MIC)
-            r.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
-            r.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
-            r.setOutputFile(localOutputFile)
-            r.prepare()
-            r.start()
-        } catch (e: IllegalStateException) {
+        val ok = recorderController.start(outputFileProvider.recordingFile())
+        if (!ok) {
             Toast.makeText(this, "Recorder error", Toast.LENGTH_LONG).show()
-            releaseRecorder()
-            return
-        } catch (e: IOException) {
-            Toast.makeText(this, "Recorder error", Toast.LENGTH_LONG).show()
-            releaseRecorder()
+            recorderController.stopAndRelease()
             return
         }
 
@@ -176,29 +124,16 @@ class MainActivity : AppCompatActivity() {
 
         sampleJob = lifecycleScope.launch {
             while (isRecording) {
-                val amp = recorder?.maxAmplitude?.toLong() ?: 0L
+                val amp = recorderController.maxAmplitude()
 
                 if (amp > 0) {
-                    val drawable = when {
-                        amp <= 200L -> R.drawable.lights0
-                        amp <= 2400L -> R.drawable.lights1
-                        amp <= 5600L -> R.drawable.lights2
-                        amp <= 11800L -> R.drawable.lights3
-                        amp <= 15000L -> R.drawable.lights4
-                        amp <= 19200L -> R.drawable.lights5
-                        amp <= 22400L -> R.drawable.lights6
-                        amp <= 25600L -> R.drawable.lights7
-                        amp <= 29800L -> R.drawable.lights8
-                        amp <= 31800L -> R.drawable.lights9
-                        else -> R.drawable.lights10
-                    }
-                    binding.meter.setImageResource(drawable)
+                    binding.meter.setImageResource(MeterLogic.drawableForAmplitude(amp))
                 }
 
-                progress += 1.0
-                ticks += amp.toDouble()
+                progress += 1
+                stats.addSample(amp)
 
-                if (progress == 10.0) {
+                if (progress == 10) {
                     binding.myImageButton.startAnimation(animationStop)
                     binding.textView2.startAnimation(animationStop)
                 }
@@ -247,23 +182,9 @@ class MainActivity : AppCompatActivity() {
         isRecording = false
         stopJobs()
 
-        val avg = if (progress > 0) ticks / progress else 0.0
-        val score = ((avg / 330.0))
-
-        val drawable = when {
-            avg <= 200.0 -> R.drawable.lights0
-            avg <= 2400.0 -> R.drawable.lights1
-            avg <= 5600.0 -> R.drawable.lights2
-            avg <= 11800.0 -> R.drawable.lights3
-            avg <= 15000.0 -> R.drawable.lights4
-            avg <= 19200.0 -> R.drawable.lights5
-            avg <= 22400.0 -> R.drawable.lights6
-            avg <= 25600.0 -> R.drawable.lights7
-            avg <= 29800.0 -> R.drawable.lights8
-            avg <= 31800.0 -> R.drawable.lights9
-            else -> R.drawable.lights10
-        }
-        binding.meter.setImageResource(drawable)
+        val avg = stats.average()
+        val score = MeterLogic.scoreForAverage(avg)
+        binding.meter.setImageResource(MeterLogic.drawableForAmplitude(avg.toLong()))
 
         val dfScore = DecimalFormat("00.00")
         val scoreText = dfScore.format(score)
@@ -276,14 +197,14 @@ class MainActivity : AppCompatActivity() {
         binding.textViewScore.text = scoreText
         adapter.add("${num++}: $scoreText")
 
-        Toast.makeText(this, "Ha totalizzato $scoreText punti!", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, ": $scoreText punti!", Toast.LENGTH_LONG).show()
 
-        progress = 0.0
-        ticks = 0.0
+        progress = 0
+        stats.reset()
 
         binding.listView.visibility = View.VISIBLE
 
-        releaseRecorder()
+        recorderController.stopAndRelease()
     }
 
     private fun stopJobs() {
@@ -294,19 +215,4 @@ class MainActivity : AppCompatActivity() {
         stopJob = null
     }
 
-    private fun releaseRecorder() {
-        val r = recorder
-        recorder = null
-
-        if (r != null) {
-            try {
-                r.stop()
-            } catch (_: Throwable) {
-            }
-            try {
-                r.release()
-            } catch (_: Throwable) {
-            }
-        }
-    }
 }
