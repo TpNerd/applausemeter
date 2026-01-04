@@ -7,7 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -407,7 +408,14 @@ class MainActivity : AppCompatActivity() {
                     contentDescription = null,
                     modifier = Modifier
                         .size(width = 64.dp, height = 98.dp)
-                        .clickable(onClick = onSliderPressed),
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    onSliderPressed()
+                                    tryAwaitRelease()
+                                },
+                            )
+                        },
                 )
             }
         }
